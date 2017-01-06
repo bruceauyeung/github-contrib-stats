@@ -101,7 +101,7 @@ func (m *OverallPullRequestMetrics) deviate() {
 }
 func (m *OverallPullRequestMetrics) Show() {
 	m.merge()
-	m.deviate()
+	//m.deviate()
 	data := [][]string{}
 	var totalMerged int
 	var totalMergedCommits int
@@ -156,6 +156,7 @@ func merge(toBeMerged []*PullRequestMetrics) []*PullRequestMetrics {
 			prm.LGTMed += metrics.LGTMed
 			prm.NonLGTMed += metrics.NonLGTMed
 			prm.Created += metrics.Created
+			prm.DeviatedMergedCommits += metrics.DeviatedMergedCommits
 		} else {
 			mapping[metrics.User] = len(merged)
 			merged = append(merged, metrics)
@@ -296,7 +297,7 @@ loop:
 				if !pr.MergedAt.Before(Config.StatBeginTime) {
 					if !Config.StatEndTime.IsZero() && pr.MergedAt.Before(Config.StatEndTime) {
 						allPRs = append(allPRs, pr)
-					}else if Config.StatEndTime.IsZero() {
+					} else if Config.StatEndTime.IsZero() {
 						allPRs = append(allPRs, pr)
 					}
 				}
@@ -468,14 +469,23 @@ func (m *PullRequestMetricsRequest) FetchMetrics() Metrics {
 				var overallMergedPRs []*github.PullRequest
 				var overallLGTMedPRs []*github.PullRequest
 				var overallNonLGTMedPRs []*github.PullRequest
+				var overallStackalyticsCommits []*PullRequestCommit
 				var weekMergedPRs []*github.PullRequest
 				var weekLGTMedPRs []*github.PullRequest
 				var weekNonLGTMedPRs []*github.PullRequest
 				var weekCreatedPRs []*github.PullRequest
+				var weekStackalyticsCommits []*PullRequestCommit
 				userName := user.Name
 
+				overallStackalyticsCommits = getStackalyticsCommits(client, ownerName, repoName, userName)
 				filteredOpenPRs := filterByUserName(openPRs, userName)
 				filteredClosedPRs := filterByUserName(closedPRs, userName)
+
+				for _, c := range overallStackalyticsCommits {
+					if inThisWeek(c.MergedAt) {
+						weekStackalyticsCommits = append(weekStackalyticsCommits, c)
+					}
+				}
 
 				for _, pr := range filteredOpenPRs {
 					if inThisWeek(pr.CreatedAt) {
@@ -523,23 +533,26 @@ func (m *PullRequestMetricsRequest) FetchMetrics() Metrics {
 				lenMergedPRs := len(overallMergedPRs)
 				lenLGTMedPRs := len(overallLGTMedPRs)
 				lenNonLGTMed := len(overallNonLGTMedPRs)
+				lenStackCommits := len(overallStackalyticsCommits)
+
 				//fmt.Printf("User: %s, Merged: %d, LGTM'ed: %d, NonLGTM'ed: %d \n",
 				//	user, lenMergedPRs, lenLGTMedPRs, lenNonLGTMed)
 
 				metrics.Overall = append(metrics.Overall, &PullRequestMetrics{
-					User:          userName,
-					Merged:        lenMergedPRs,
-					MergedCommits: sumCommits(overallMergedPRs),
-					LGTMed:        lenLGTMedPRs,
-					NonLGTMed:     lenNonLGTMed,
-					Created:       -1,
+					User:                  userName,
+					Merged:                lenMergedPRs,
+					MergedCommits:         sumCommits(overallMergedPRs),
+					DeviatedMergedCommits: lenStackCommits,
+					LGTMed:                lenLGTMedPRs,
+					NonLGTMed:             lenNonLGTMed,
+					Created:               -1,
 				})
 
 				weekMetrics.Week = append(weekMetrics.Week, &PullRequestMetrics{
 					User:                  userName,
 					Merged:                len(weekMergedPRs),
 					MergedCommits:         sumCommits(weekMergedPRs),
-					DeviatedMergedCommits: -1,
+					DeviatedMergedCommits: len(weekStackalyticsCommits),
 					LGTMed:                len(weekLGTMedPRs),
 					NonLGTMed:             len(weekNonLGTMedPRs),
 					Created:               len(weekCreatedPRs),

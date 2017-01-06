@@ -9,11 +9,12 @@ except statistics analysis of the numbers of merged/LGTM'ed/NonLGTM'ed(open) PRs
 2. `go get -u github.com/mgutz/ansi`
 3. `go get -u golang.org/x/oauth2`
 4. `go get -u github.com/olekukonko/tablewriter`
-5. `git clone https://github.com/bruceauyeung/github-contrib-stats`
-6. `cd ./github-contrib-stats`
-7. `cp config.toml.dist config.toml`
-8. fill in `accessToken` field in `config.toml`, you can generate one from https://github.com/settings/tokens (make sure **repo** scope is checked)
-9. fill in other fields in `config.toml`.
+5. `go get -u github.com/BurntSushi/toml`
+6. `git clone https://github.com/bruceauyeung/github-contrib-stats`
+7. `cd ./github-contrib-stats`
+8. `cp config.toml.dist config.toml`
+9. fill in `accessToken` field in `config.toml`, you can generate one from https://github.com/settings/tokens (make sure **repo** scope is checked)
+10. fill in other fields in `config.toml`.
 
 After, you can run the below command
 ```
