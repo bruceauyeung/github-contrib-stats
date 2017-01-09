@@ -121,7 +121,13 @@ func (m *OverallPullRequestMetrics) Show() {
 	}
 	if len(data) != 0 {
 		table := tablewriter.NewWriter(os.Stdout)
-		fmt.Printf("\nOverall Statistics ( %v ~ %v)\n", Config.StatBeginTime, time.Now())
+		var endTime time.Time
+		if Config.StatEndTime.IsZero() {
+			endTime = time.Now()
+		} else {
+			endTime = Config.StatEndTime
+		}
+		fmt.Printf("\nOverall Statistics ( %v ~ %v)\n", Config.StatBeginTime, endTime)
 		mergedCommitsHeader := "Merged Commits(actual/stack)"
 		table.SetHeader([]string{"User Name", "Merged PRs", mergedCommitsHeader, "LGTM'ed PRs", "NonLGTM'ed PRs"})
 		table.AppendBulk(data)
@@ -279,7 +285,6 @@ loop:
 		if err != nil {
 			return nil, err
 		}
-
 		fmt.Printf("page:%d fin\n", page)
 		for _, pr := range prs {
 
@@ -310,7 +315,7 @@ loop:
 			break
 		}
 		opt.ListOptions.Page = resp.NextPage
-		page++
+		page += 1
 	}
 
 	return allPRs, nil
@@ -429,11 +434,11 @@ func sumCommits(prs []*github.PullRequest) int {
 	return sum
 }
 func inThisWeek(t *time.Time) bool {
-	if t.Year() >= Config.ThisWeekFirstDay.Year() &&
-		t.Month() >= Config.ThisWeekFirstDay.Month() &&
-		t.Day() >= Config.ThisWeekFirstDay.Day() {
+
+	if !t.Before(Config.ThisWeekFirstDay) && !t.After(time.Now()) {
 		return true
 	}
+
 	return false
 }
 func (m *PullRequestMetricsRequest) FetchMetrics() Metrics {
@@ -477,6 +482,7 @@ func (m *PullRequestMetricsRequest) FetchMetrics() Metrics {
 				var weekStackalyticsCommits []*PullRequestCommit
 				userName := user.Name
 
+				//fmt.Printf("%s/%s : listing stackalytics style commits\n", ownerName, repoName)
 				overallStackalyticsCommits = getStackalyticsCommits(client, ownerName, repoName, userName)
 				filteredOpenPRs := filterByUserName(openPRs, userName)
 				filteredClosedPRs := filterByUserName(closedPRs, userName)
@@ -513,6 +519,9 @@ func (m *PullRequestMetricsRequest) FetchMetrics() Metrics {
 
 				for _, pr := range filteredClosedPRs {
 					// Merged is always nil but MergedAt is not.
+					//fmt.Printf("pr title : %#v\n", *pr.Title)
+					//fmt.Printf("pr is merged ? %#v\n", pr.MergedAt != nil)
+
 					if pr.MergedAt != nil {
 						//get the specified pull request to fill in all other blank fields (such as Commits field)
 						pr, err := getPullRequest(client, ownerName, repoName, *pr.Number)
