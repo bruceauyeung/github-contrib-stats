@@ -13,6 +13,10 @@ import (
 	"github.com/olekukonko/tablewriter"
 )
 
+var (
+	LGTMLabels = []string{"LGTM", "Docs LGTM", "Tech Review LGTM"}
+)
+
 type AllPullRequestMetrics struct {
 	*WeekPullRequestMetrics
 	*OverallPullRequestMetrics
@@ -349,7 +353,7 @@ func getPullRequestLatestLGTMEvent(client *github.Client, owner string, repo str
 		}
 		for _, evt := range events {
 			//fmt.Printf("event created at : %v", evt.CreatedAt)
-			if *evt.Event == "labeled" && (strings.EqualFold(*evt.Label.Name, "LGTM") || strings.EqualFold(*evt.Label.Name, "Docs LGTM")) {
+			if *evt.Event == "labeled" && isLGTMLabel(*evt.Label.Name) {
 				return evt, nil
 			}
 		}
@@ -366,8 +370,16 @@ func getPullRequestLatestLGTMEvent(client *github.Client, owner string, repo str
 }
 func isLGTMed(client *github.Client, owner string, repo string, number int) bool {
 	lnames := getPullRequestLabelNames(client, owner, repo, number)
-	if StringSliceContainsAnyFold(lnames, "LGTM", "Docs LGTM") {
+	if StringSliceContainsAnyFold(lnames, LGTMLabels...) {
 		return true
+	}
+	return false
+}
+func isLGTMLabel(labelName string) bool {
+	for _, LGTMLabel := range LGTMLabels {
+		if strings.EqualFold(LGTMLabel, labelName) {
+			return true
+		}
 	}
 	return false
 }
