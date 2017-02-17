@@ -24,10 +24,9 @@ dimension = "all"
 # Sunday:0; Monday:1; Tuesday:2; Wednesday:3; Thursday:4; Friday:5; Saturday:6
 weekFirstDay=6
 
-[[users]]
-name = "bruceauyeung" # github user names who contribute to the specified repositories.
-stackalyticsDeviation = 1
+# no sort:0; sort by merged PRs:1;sort by merged commits:2;
+sort=1
 
 [[users]]
-name = "tanshanshan"
-stackalyticsDeviation = 0
+name = "bruceauyeung"
+realName = "欧阳钦华"

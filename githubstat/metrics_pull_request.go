@@ -158,8 +158,19 @@ func getRealName(userName string) string {
 	return ""
 }
 func sortMetrics(toBeSort []*PullRequestMetrics) []*PullRequestMetrics {
-	sort.Slice(toBeSort, func(i, j int) bool { return toBeSort[i].MergedCommits > toBeSort[j].MergedCommits })
-	return toBeSort
+	switch Config.Sort {
+	case NoSort:
+		return toBeSort
+	case SortByMergedPRs:
+		sort.Slice(toBeSort, func(i, j int) bool { return toBeSort[i].Merged > toBeSort[j].Merged })
+		return toBeSort
+	case SortByMergedCommits:
+		sort.Slice(toBeSort, func(i, j int) bool { return toBeSort[i].MergedCommits > toBeSort[j].MergedCommits })
+		return toBeSort
+	default:
+		return toBeSort
+
+	}
 }
 func merge(toBeMerged []*PullRequestMetrics) []*PullRequestMetrics {
 	// user name to slice index of the first occurence of user's metrics

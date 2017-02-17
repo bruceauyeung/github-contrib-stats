@@ -9,6 +9,10 @@ import (
 const (
 	DimensionOverall = "Overall"
 	DimensionWeek    = "Week"
+
+	NoSort              = 0
+	SortByMergedPRs     = 1
+	SortByMergedCommits = 2
 )
 
 type Load interface {
@@ -20,6 +24,7 @@ type User struct {
 	Name     string
 	RealName string
 }
+
 type Configuration struct {
 	StatBeginTime    time.Time
 	StatEndTime      time.Time
@@ -30,6 +35,7 @@ type Configuration struct {
 	Dimension        string
 	WeekFirstDay     time.Weekday
 	ThisWeekFirstDay time.Time
+	Sort             int
 }
 
 func getWeekFirstDay(t time.Time) time.Time {
