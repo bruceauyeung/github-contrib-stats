@@ -3,11 +3,11 @@ package githubstat
 import (
 	"fmt"
 	"os"
+	"sort"
 	"time"
 
-	"strings"
-
 	"strconv"
+	"strings"
 
 	"github.com/google/go-github/github"
 	"github.com/olekukonko/tablewriter"
@@ -31,9 +31,10 @@ type WeekPullRequestMetrics struct {
 	Week []*PullRequestMetrics
 }
 
-func (w *WeekPullRequestMetrics) merge() {
+func (w *WeekPullRequestMetrics) mergeAndSort() {
 
 	w.Week = merge(w.Week)
+	w.Week = sortMetrics(w.Week)
 
 }
 func (w *WeekPullRequestMetrics) Show() {
@@ -41,7 +42,7 @@ func (w *WeekPullRequestMetrics) Show() {
 		fmt.Println("Week statistics is disabled because statEndTime is specified")
 		return
 	}
-	w.merge()
+	w.mergeAndSort()
 	data := [][]string{}
 	var totalMerged int
 	var totalMergedCommits int
@@ -50,7 +51,14 @@ func (w *WeekPullRequestMetrics) Show() {
 	var totalCreated int
 
 	for _, metrics := range w.Week {
-		r := []string{metrics.User, strconv.Itoa(metrics.Merged),
+		var user string
+
+		if realName := getRealName(metrics.User); realName != "" {
+			user = fmt.Sprintf("%s(%s)", metrics.User, realName)
+		} else {
+			user = metrics.User
+		}
+		r := []string{user, strconv.Itoa(metrics.Merged),
 			strconv.Itoa(metrics.MergedCommits), strconv.Itoa(metrics.LGTMed),
 			strconv.Itoa(metrics.NonLGTMed), strconv.Itoa(metrics.Created)}
 		data = append(data, r)
@@ -83,43 +91,39 @@ type OverallPullRequestMetrics struct {
 	Overall []*PullRequestMetrics
 }
 type PullRequestMetrics struct {
-	User                  string
-	Merged                int // already merged PRs, PRs of this kind are also closed
-	MergedCommits         int // the sum of commits number in merged PRs
-	DeviatedMergedCommits int // stackalytics.com also do statistics analysis on kubernetes commits, but shamefully incorrectly. for report purpose, we calculate these through stackalyticsDeviation
-	LGTMed                int // open PRs with LGTM label
-	NonLGTMed             int //open PRs without LGTM label
-	Created               int // created PRs including all open PRs and all merged closed PRs
+	User          string
+	Merged        int // already merged PRs, PRs of this kind are also closed
+	MergedCommits int // the sum of commits number in merged PRs, is consistent with stackalytics.com's
+	LGTMed        int // open PRs with LGTM label
+	NonLGTMed     int //open PRs without LGTM label
+	Created       int // created PRs including all open PRs and all merged closed PRs
 }
 
-func (m *OverallPullRequestMetrics) merge() {
+func (m *OverallPullRequestMetrics) mergeAndSort() {
 
 	m.Overall = merge(m.Overall)
+	m.Overall = sortMetrics(m.Overall)
 
 }
 
-func (m *OverallPullRequestMetrics) deviate() {
-	for _, metrics := range m.Overall {
-		metrics.DeviatedMergedCommits = metrics.MergedCommits + getStackalyticsDeviation(metrics.User)
-	}
-}
 func (m *OverallPullRequestMetrics) Show() {
-	m.merge()
-	//m.deviate()
+	m.mergeAndSort()
 	data := [][]string{}
 	var totalMerged int
 	var totalMergedCommits int
-	var totalDeviatedMergedCommits int
 	var totalLGTMed int
 	var totalNonLGTMed int
 	for _, metrics := range m.Overall {
-		var mergedCommits string
-		mergedCommits = fmt.Sprintf("%d / %d", metrics.MergedCommits, metrics.DeviatedMergedCommits)
-		r := []string{metrics.User, strconv.Itoa(metrics.Merged), mergedCommits, strconv.Itoa(metrics.LGTMed), strconv.Itoa(metrics.NonLGTMed)}
+		var user string
+		if realName := getRealName(metrics.User); realName != "" {
+			user = fmt.Sprintf("%s(%s)", metrics.User, realName)
+		} else {
+			user = metrics.User
+		}
+		r := []string{user, strconv.Itoa(metrics.Merged), strconv.Itoa(metrics.MergedCommits), strconv.Itoa(metrics.LGTMed), strconv.Itoa(metrics.NonLGTMed)}
 		data = append(data, r)
 		totalMerged += metrics.Merged
 		totalMergedCommits += metrics.MergedCommits
-		totalDeviatedMergedCommits += metrics.DeviatedMergedCommits
 		totalLGTMed += metrics.LGTMed
 		totalNonLGTMed += metrics.NonLGTMed
 	}
@@ -132,13 +136,12 @@ func (m *OverallPullRequestMetrics) Show() {
 			endTime = Config.StatEndTime
 		}
 		fmt.Printf("\nOverall Statistics ( %v ~ %v)\n", Config.StatBeginTime, endTime)
-		mergedCommitsHeader := "Merged Commits(actual/stack)"
-		table.SetHeader([]string{"User Name", "Merged PRs", mergedCommitsHeader, "LGTM'ed PRs", "NonLGTM'ed PRs"})
+		table.SetHeader([]string{"User Name", "Merged PRs", "Merged Commits", "LGTM'ed PRs", "NonLGTM'ed PRs"})
 		table.AppendBulk(data)
 		table.Append([]string{
 			"Total",
 			strconv.Itoa(totalMerged),
-			fmt.Sprintf("%d / %d", totalMergedCommits, totalDeviatedMergedCommits),
+			strconv.Itoa(totalMergedCommits),
 			strconv.Itoa(totalLGTMed),
 			strconv.Itoa(totalNonLGTMed),
 		})
@@ -146,13 +149,17 @@ func (m *OverallPullRequestMetrics) Show() {
 	}
 
 }
-func getStackalyticsDeviation(userName string) int {
+func getRealName(userName string) string {
 	for _, u := range Config.Users {
 		if u.Name == userName {
-			return u.StackalyticsDeviation
+			return u.RealName
 		}
 	}
-	return 0
+	return ""
+}
+func sortMetrics(toBeSort []*PullRequestMetrics) []*PullRequestMetrics {
+	sort.Slice(toBeSort, func(i, j int) bool { return toBeSort[i].MergedCommits > toBeSort[j].MergedCommits })
+	return toBeSort
 }
 func merge(toBeMerged []*PullRequestMetrics) []*PullRequestMetrics {
 	// user name to slice index of the first occurence of user's metrics
@@ -166,7 +173,6 @@ func merge(toBeMerged []*PullRequestMetrics) []*PullRequestMetrics {
 			prm.LGTMed += metrics.LGTMed
 			prm.NonLGTMed += metrics.NonLGTMed
 			prm.Created += metrics.Created
-			prm.DeviatedMergedCommits += metrics.DeviatedMergedCommits
 		} else {
 			mapping[metrics.User] = len(merged)
 			merged = append(merged, metrics)
@@ -560,23 +566,21 @@ func (m *PullRequestMetricsRequest) FetchMetrics() Metrics {
 				//	user, lenMergedPRs, lenLGTMedPRs, lenNonLGTMed)
 
 				metrics.Overall = append(metrics.Overall, &PullRequestMetrics{
-					User:                  userName,
-					Merged:                lenMergedPRs,
-					MergedCommits:         sumCommits(overallMergedPRs),
-					DeviatedMergedCommits: lenStackCommits,
-					LGTMed:                lenLGTMedPRs,
-					NonLGTMed:             lenNonLGTMed,
-					Created:               -1,
+					User:          userName,
+					Merged:        lenMergedPRs,
+					MergedCommits: lenStackCommits,
+					LGTMed:        lenLGTMedPRs,
+					NonLGTMed:     lenNonLGTMed,
+					Created:       -1,
 				})
 
 				weekMetrics.Week = append(weekMetrics.Week, &PullRequestMetrics{
-					User:                  userName,
-					Merged:                len(weekMergedPRs),
-					MergedCommits:         sumCommits(weekMergedPRs),
-					DeviatedMergedCommits: len(weekStackalyticsCommits),
-					LGTMed:                len(weekLGTMedPRs),
-					NonLGTMed:             len(weekNonLGTMedPRs),
-					Created:               len(weekCreatedPRs),
+					User:          userName,
+					Merged:        len(weekMergedPRs),
+					MergedCommits: len(weekStackalyticsCommits),
+					LGTMed:        len(weekLGTMedPRs),
+					NonLGTMed:     len(weekNonLGTMedPRs),
+					Created:       len(weekCreatedPRs),
 				})
 
 			}
@@ -588,26 +592,24 @@ func (m *PullRequestMetricsRequest) FetchMetrics() Metrics {
 		OverallPullRequestMetrics: &OverallPullRequestMetrics{
 			[]*PullRequestMetrics{
 				&PullRequestMetrics{
-					User:                  "",
-					Merged:                -1,
-					MergedCommits:         -1,
-					DeviatedMergedCommits: -1,
-					LGTMed:                -1,
-					NonLGTMed:             -1,
-					Created:               -1,
+					User:          "",
+					Merged:        -1,
+					MergedCommits: -1,
+					LGTMed:        -1,
+					NonLGTMed:     -1,
+					Created:       -1,
 				},
 			},
 		},
 		WeekPullRequestMetrics: &WeekPullRequestMetrics{
 			[]*PullRequestMetrics{
 				&PullRequestMetrics{
-					User:                  "",
-					Merged:                -1,
-					MergedCommits:         -1,
-					DeviatedMergedCommits: -1,
-					LGTMed:                -1,
-					NonLGTMed:             -1,
-					Created:               -1,
+					User:          "",
+					Merged:        -1,
+					MergedCommits: -1,
+					LGTMed:        -1,
+					NonLGTMed:     -1,
+					Created:       -1,
 				},
 			},
 		}}

@@ -17,8 +17,8 @@ type Load interface {
 var Config Configuration
 
 type User struct {
-	Name                  string
-	StackalyticsDeviation int
+	Name     string
+	RealName string
 }
 type Configuration struct {
 	StatBeginTime    time.Time

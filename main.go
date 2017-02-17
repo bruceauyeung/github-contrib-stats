@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"strings"
 
+	"time"
+
 	"./githubstat"
 )
 
 func main() {
+	start := time.Now()
 	flagMetrics := flag.String("metrics", "", "available metrics: (pr)")
 	dimension := flag.String("dimension", "", "available dimension: (overall)")
 	flag.Parse()
@@ -49,4 +52,6 @@ func main() {
 	metricsRequest.SetParameters(&metricsParameters)
 	metrics := metricsRequest.FetchMetrics()
 	metrics.Show()
+	elapsed := time.Since(start)
+	fmt.Printf("stats finished and spent %v minutes", elapsed.Minutes())
 }
