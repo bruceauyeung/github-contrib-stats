@@ -20,17 +20,23 @@ func (m *PullRequestCommit) findMergedTime(client *github.Client, sameCommitter 
 	SHA := m.RepositoryCommit.SHA
 	owner := m.Owner
 	repo := m.Repo
-	author := m.RepositoryCommit.Author.Login
-	if !sameCommitter {
+	var author *string
+	if m.RepositoryCommit.Author != nil {
+		author = m.RepositoryCommit.Author.Login
+	}
+	if !sameCommitter && m.RepositoryCommit.Committer != nil {
 		author = m.RepositoryCommit.Committer.Login
 	}
 
-	pr := findPullRequest(client, owner, repo, *author, *SHA)
-	if pr == nil {
-		return false
+	if author != nil {
+		pr := findPullRequest(client, owner, repo, *author, *SHA)
+		if pr == nil {
+			return false
+		}
+		m.MergedAt = pr.MergedAt
+		return true
 	}
-	m.MergedAt = pr.MergedAt
-	return true
+	return false
 }
 
 func listCommits(client *github.Client, owner string, repo string, author string) ([]*github.RepositoryCommit, error) {
