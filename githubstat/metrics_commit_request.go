@@ -130,13 +130,16 @@ func findPullRequest(client *github.Client, owner, repo, author, commitSHA strin
 
 func getStackalyticsCommits(client *github.Client, owner string, repo string, author string) []*PullRequestCommit {
 	//fmt.Printf("%s/%s : listing commits of stackalytics.com style\n", owner, repo)
+	var prCommits []*PullRequestCommit
 	commits, err := listCommits(client, owner, repo, author)
 	if err != nil {
+		if strings.Contains(err.Error(), "409") && strings.Contains(err.Error(), "Git Repository is empty") {
+			return prCommits
+		}
 		panic(err)
 	}
 	commits = filterCommits(commits)
 
-	var prCommits []*PullRequestCommit
 	for _, commit := range commits {
 		warpCommit := &PullRequestCommit{commit, owner, repo, nil}
 		if !warpCommit.findMergedTime(client, true) {
